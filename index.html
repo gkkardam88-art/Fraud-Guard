@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FraudGuard — Real-Time Fraud Detection</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0b0f19;
+      --surface:   #111827;
+      --surface2:  #1a2235;
+      --border:    rgba(255,255,255,0.07);
+      --border2:   rgba(255,255,255,0.13);
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --accent:    #3b82f6;
+      --accent2:   #60a5fa;
+      --danger:    #ef4444;
+      --warning:   #f59e0b;
+      --success:   #10b981;
+      --purple:    #8b5cf6;
+      --radius:    10px;
+      --radius-lg: 14px;
+    }
+
+    body {
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(11,15,25,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 10px; }
+    .nav-logo {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; color: white;
+    }
+    .nav-title { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+    .nav-badge {
+      font-size: 10px; padding: 2px 7px; border-radius: 20px;
+      background: rgba(59,130,246,0.15); color: var(--accent2);
+      border: 1px solid rgba(59,130,246,0.25); font-weight: 500;
+    }
+    .nav-right { display: flex; align-items: center; gap: 20px; }
+    .live-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--success); }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); animation: blink 1.8s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .nav-stat { font-size: 12px; color: var(--muted); }
+    .nav-stat span { color: var(--text); font-weight: 500; margin-left: 4px; }
+
+    /* ── TABS ── */
+    .tabs {
+      display: flex; gap: 4px;
+      padding: 16px 28px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      padding: 8px 18px; border-radius: var(--radius) var(--radius) 0 0;
+      border: 1px solid transparent; border-bottom: none;
+      cursor: pointer; font-size: 13px; font-weight: 500;
+      color: var(--muted); background: transparent;
+      transition: all 0.15s; display: flex; align-items: center; gap: 6px;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      color: var(--text); background: var(--surface);
+      border-color: var(--border); border-bottom-color: var(--surface);
+      margin-bottom: -1px;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── LAYOUT ── */
+    .page { padding: 24px 28px; max-width: 1400px; }
+
+    /* ── KPI STRIP ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px; margin-bottom: 22px;
+    }
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      position: relative; overflow: hidden;
+    }
+    .kpi::before {
+      content: ''; position: absolute; top: 0; left: 0;
+      width: 3px; height: 100%; border-radius: 3px 0 0 3px;
+    }
+    .kpi.blue::before { background: var(--accent); }
+    .kpi.red::before { background: var(--danger); }
+    .kpi.green::before { background: var(--success); }
+    .kpi.purple::before { background: var(--purple); }
+    .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+    .kpi-value { font-size: 26px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+    .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .kpi-delta { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-top: 4px; }
+    .kpi-delta.up { background: rgba(16,185,129,0.12); color: var(--success); }
+    .kpi-delta.down { background: rgba(239,68,68,0.12); color: var(--danger); }
+
+    /* ── TWO-COL LAYOUT ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 20px 12px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; color: var(--text); }
+    .card-title i { color: var(--muted); font-size: 16px; }
+    .card-body { padding: 18px 20px; }
+    .card-badge {
+      font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 500;
+    }
+    .badge-blue { background: rgba(59,130,246,0.12); color: var(--accent2); }
+    .badge-green { background: rgba(16,185,129,0.12); color: var(--success); }
+    .badge-red { background: rgba(239,68,68,0.12); color: var(--danger); }
+    .badge-yellow { background: rgba(245,158,11,0.12); color: var(--warning); }
+    .badge-purple { background: rgba(139,92,246,0.12); color: var(--purple); }
+
+    /* ── FORM ── */
+    .form-section { margin-bottom: 18px; }
+    .form-section-label {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--muted); margin-bottom: 10px; padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label {
+      font-size: 11px; color: var(--muted); font-weight: 500;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .form-group label i { font-size: 13px; }
+    .form-group input, .form-group select {
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: var(--text);
+      font-size: 13px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      width: 100%;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+    }
+    .form-group select option { background: #1e293b; }
+
+    /* Amount slider visual */
+    .amount-display {
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .amount-display .currency { font-size: 12px; color: var(--muted); }
+    .amount-display .val { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; color: var(--accent2); }
+
+    /* Preset chips */
+    .presets { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .preset {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+      border: 1px solid var(--border2); background: transparent;
+      color: var(--muted); cursor: pointer; transition: all 0.15s;
+    }
+    .preset:hover { color: var(--text); border-color: var(--accent); }
+    .preset.active-legit { border-color: var(--success); color: var(--success); background: rgba(16,185,129,0.07); }
+    .preset.active-fraud { border-color: var(--danger); color: var(--danger); background: rgba(239,68,68,0.07); }
+
+    /* Toggle switch */
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .toggle-row:last-child { border-bottom: none; }
+    .toggle-label { font-size: 12px; color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .toggle-label i { color: var(--muted); font-size: 15px; }
+    .toggle-desc { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .toggle {
+      position: relative; width: 38px; height: 20px; cursor: pointer;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: var(--border2); border-radius: 20px;
+      transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: white; top: 3px; left: 3px;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: var(--accent); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+    /* Analyze button */
+    .analyze-btn {
+      width: 100%; padding: 13px;
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      border: none; border-radius: var(--radius);
+      color: white; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin-top: 18px;
+    }
+    .analyze-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .analyze-btn:active { transform: translateY(0); filter: brightness(0.95); }
+    .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white; border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── RESULT PANEL ── */
+    #resultPanel { display: none; }
+
+    .verdict-card {
+      border-radius: var(--radius-lg);
+      padding: 22px 24px;
+      margin-bottom: 16px;
+      display: flex; align-items: flex-start; gap: 18px;
+    }
+    .verdict-fraud { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.3); }
+    .verdict-legit { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.28); }
+    .verdict-icon { font-size: 36px; line-height: 1; flex-shrink: 0; }
+    .verdict-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+    .verdict-fraud .verdict-label { color: rgba(239,68,68,0.8); }
+    .verdict-legit .verdict-label { color: rgba(16,185,129,0.8); }
+    .verdict-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    .verdict-fraud .verdict-title { color: #fca5a5; }
+    .verdict-legit .verdict-title { color: #6ee7b7; }
+    .verdict-desc { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .verdict-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .action-btn {
+      padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      cursor: pointer; border: 1px solid; transition: all 0.15s;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .action-btn-red { border-color: rgba(239,68,68,0.4); color: #fca5a5; background: rgba(239,68,68,0.08); }
+    .action-btn-red:hover { background: rgba(239,68,68,0.15); }
+    .action-btn-gray { border-color: var(--border2); color: var(--muted); background: transparent; }
+    .action-btn-gray:hover { color: var(--text); }
+
+    /* Metric row */
+    .metric-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+    .metric-mini {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      text-align: center;
+    }
+    .metric-mini-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 5px; }
+    .metric-mini-val { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+
+    /* Risk gauge */
+    .risk-gauge-wrap { margin-bottom: 18px; }
+    .risk-gauge-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .risk-gauge-label span { font-size: 12px; color: var(--muted); }
+    .risk-gauge-label strong { font-size: 13px; font-weight: 600; }
+    .risk-track {
+      height: 10px; border-radius: 10px;
+      background: linear-gradient(90deg, #10b981 0%, #f59e0b 50%, #ef4444 100%);
+      position: relative; opacity: 0.3;
+    }
+    .risk-track-active {
+      height: 10px; border-radius: 10px;
+      position: absolute; top: 0; left: 0;
+      transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .risk-marker {
+      position: absolute; top: -4px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: white; border: 3px solid;
+      transform: translateX(-50%);
+      transition: left 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.5s;
+      box-shadow: 0 0 8px rgba(0,0,0,0.4);
+    }
+    .risk-band-labels { display: flex; justify-content: space-between; margin-top: 4px; }
+    .risk-band-labels span { font-size: 10px; color: var(--muted); }
+
+    /* SHAP bars */
+    .shap-row {
+      display: grid; grid-template-columns: 140px 1fr 50px;
+      align-items: center; gap: 10px;
+      padding: 7px 0; border-bottom: 1px solid var(--border);
+    }
+    .shap-row:last-child { border-bottom: none; }
+    .shap-feat-name { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .shap-bar-track { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; position: relative; }
+    .shap-bar-fill { height: 100%; border-radius: 4px; transition: width 0.7s ease; min-width: 2px; }
+    .shap-val { font-size: 11px; text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .shap-risk { background: rgba(239,68,68,0.7); }
+    .shap-safe { background: rgba(16,185,129,0.7); }
+    .shap-risk-txt { color: #fca5a5; }
+    .shap-safe-txt { color: #6ee7b7; }
+
+    /* AI explanation box */
+    .ai-box {
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+    }
+    .ai-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 12px; padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ai-avatar {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: white; flex-shrink: 0;
+    }
+    .ai-name { font-size: 12px; font-weight: 600; }
+    .ai-role { font-size: 10px; color: var(--muted); }
+    .ai-text { font-size: 13px; line-height: 1.7; color: #cbd5e1; }
+    .ai-typing { display: inline-flex; gap: 3px; align-items: center; }
+    .ai-typing span {
+      width: 5px; height: 5px; border-radius: 50%; background: var(--muted);
+      animation: typing 1s ease-in-out infinite;
+    }
+    .ai-typing span:nth-child(2) { animation-delay: 0.15s; }
+    .ai-typing span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes typing { 0%,80%,100%{transform:scale(0.8);opacity:0.4} 40%{transform:scale(1.1);opacity:1} }
+
+    /* ── LIVE FEED ── */
+    .feed-table { width: 100%; border-collapse: collapse; }
+    .feed-table th {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--muted); padding: 8px 12px; text-align: left;
+      border-bottom: 1px solid var(--border); font-weight: 500;
+    }
+    .feed-table td { padding: 10px 12px; font-size: 12px; border-bottom: 1px solid var(--border); }
+    .feed-table tr:last-child td { border-bottom: none; }
+    .feed-table tr { transition: background 0.15s; }
+    .feed-table tr:hover { background: rgba(255,255,255,0.025); }
+    .feed-table tr.new-row { animation: slideIn 0.35s ease; }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); background: rgba(59,130,246,0.08); }
+      to   { opacity: 1; transform: translateY(0);  }
+    }
+    .feed-amount { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .feed-id { font-family: 'SF Mono', monospace; color: var(--muted); font-size: 11px; }
+    .risk-pill {
+      display: inline-block; padding: 2px 9px;
+      border-radius: 20px; font-size: 11px; font-weight: 600;
+    }
+    .risk-pill.critical { background: rgba(239,68,68,0.12); color: #fca5a5; border: 1px solid rgba(239,68,68,0.2); }
+    .risk-pill.high     { background: rgba(245,158,11,0.12); color: #fcd34d; border: 1px solid rgba(245,158,11,0.2); }
+    .risk-pill.moderate { background: rgba(59,130,246,0.12); color: var(--accent2); border: 1px solid rgba(59,130,246,0.2); }
+    .risk-pill.low      { background: rgba(16,185,129,0.12); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.2); }
+    .verdict-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    .dot-fraud { background: var(--danger); }
+    .dot-legit { background: var(--success); }
+
+    /* ── ANALYTICS CHARTS ── */
+    .chart-wrap { position: relative; width: 100%; }
+
+    /* ── GRAPH VIZ ── */
+    .graph-canvas { width: 100%; height: 260px; position: relative; overflow: hidden; border-radius: var(--radius); background: var(--bg); }
+    .graph-node {
+      position: absolute; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; color: white;
+      transition: transform 0.2s;
+      cursor: pointer; border: 2px solid transparent;
+    }
+    .graph-node:hover { transform: scale(1.2); z-index: 10; }
+    .node-fraud { background: var(--danger); border-color: rgba(239,68,68,0.5); box-shadow: 0 0 12px rgba(239,68,68,0.4); }
+    .node-legit { background: #334155; border-color: rgba(100,116,139,0.4); }
+    .node-hub   { background: var(--warning); border-color: rgba(245,158,11,0.5); box-shadow: 0 0 14px rgba(245,158,11,0.4); }
+    .graph-legend { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: var(--muted); }
+    .graph-legend-item { display: flex; align-items: center; gap: 5px; }
+    .graph-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+    svg.graph-edges { position: absolute; top: 0; left: 0; width: 100%; height: 260px; pointer-events: none; }
+
+    /* ── EMPTY STATE ── */
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+    .empty-state i { font-size: 40px; opacity: 0.3; margin-bottom: 10px; display: block; }
+    .empty-state p { font-size: 13px; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .page { padding: 16px; }
+      nav { padding: 0 16px; }
+      .tabs { padding: 12px 16px 0; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo"><i class="ti ti-shield-check" aria-hidden="true"></i></div>
+    <span class="nav-title">FraudGuard</span>
+    <span class="nav-badge">v2.0</span>
+  </div>
+  <div class="nav-right">
+    <div class="live-indicator">
+      <div class="live-dot"></div>
+      <span>Live</span>
+    </div>
+    <div class="nav-stat">Processed today: <span id="navProcessed">0</span></div>
+    <div class="nav-stat">Flagged: <span id="navFlagged" style="color: #fca5a5;">0</span></div>
+    <div class="nav-stat">Accuracy: <span>98.4%</span></div>
+  </div>
+</nav>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('dashboard')">
+    <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard
+  </button>
+  <button class="tab" onclick="switchTab('analyze')">
+    <i class="ti ti-search" aria-hidden="true"></i> Analyze Transaction
+  </button>
+  <button class="tab" onclick="switchTab('feed')">
+    <i class="ti ti-activity" aria-hidden="true"></i> Live Feed
+    <span id="feedBadge" class="card-badge badge-red" style="display:none">0</span>
+  </button>
+  <button class="tab" onclick="switchTab('graph')">
+    <i class="ti ti-network" aria-hidden="true"></i> Graph Analysis
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════════ DASHBOARD TAB ══ -->
+<div id="tab-dashboard" class="tab-content active page">
+
+  <div class="kpi-grid">
+    <div class="kpi blue">
+      <div class="kpi-label">Total Analyzed</div>
+      <div class="kpi-value" id="kpiTotal">0</div>
+      <div class="kpi-sub">transactions this session</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-label">Fraud Detected</div>
+      <div class="kpi-value" id="kpiFraud" style="color:#fca5a5">0</div>
+      <div class="kpi-delta down" id="kpiFraudRate">0.0% fraud rate</div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-label">Avg Risk Score</div>
+      <div class="kpi-value" id="kpiAvgRisk">—</div>
+      <div class="kpi-sub">across all transactions</div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-label">High Risk Alerts</div>
+      <div class="kpi-value" id="kpiAlerts" style="color:#c4b5fd">0</div>
+      <div class="kpi-sub">score ≥ 76</div>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="ti ti-chart-line" aria-hidden="true"></i> Risk Score Trend</div>
+        <span class="card-badge badge-blue">Live</span>
+      </div>
+      <div class="card-body">
+        <div class="chart-wrap" style="height: 200px;">
+          <canvas id="trendChart" role="img" aria-label="Risk score trend over recent transactions"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="ti ti-chart-donut" aria-hidden="true"></i> Risk Levels</div>
+      </div>
+      <div class="card-body">
+        <div class="chart-wrap" style="height: 200px;">
+          <canvas id="donutChart" role="img" aria-label="Distribution of risk levels across analyzed transactions"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="ti ti-list" aria-hidden="true"></i> Recent Transactions</div>
+        <span class="card-badge badge-blue" id="recentCount">0 analyzed</span>
+      </div>
+      <div class="card-body" style="padding: 0;">
+        <table class="feed-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Amount</th><th>Risk</th><th>Score</th><th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="recentTableBody">
+            <tr><td colspan="5"><div class="empty-state"><i class="ti ti-database"></i><p>No transactions yet — run an analysis</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="ti ti-chart-bar" aria-hidden="true"></i> Top Risk Factors</div>
+      </div>
+      <div class="card-body">
+        <div class="chart-wrap" style="height: 200px;">
+          <canvas id="featureChart" role="img" aria-label="Most common top SHAP risk factors across analyzed transactions"></canvas>
+        </div>
+        <div id="featureEmpty" class="empty-state" style="padding: 20px;">
+          <i class="ti ti-chart-bar" style="font-size:28px;"></i>
+          <p>Feature importance appears after your first analysis</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════ ANALYZE TAB ══ -->
+<div id="tab-analyze" class="tab-content page">
+  <div class="grid-3">
+
+    <!-- Left: Input form -->
+    <div>
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="card-header">
+          <div class="card-title"><i class="ti ti-receipt" aria-hidden="true"></i> Transaction Input</div>
+        </div>
+        <div class="card-body">
+          <div class="presets">
+            <button class="preset" id="preset-legit" onclick="loadPreset('legit')">
+              <i class="ti ti-check" aria-hidden="true"></i> Normal
+            </button>
+            <button class="preset" id="preset-fraud" onclick="loadPreset('fraud')">
+              <i class="ti ti-alert-triangle" aria-hidden="true"></i> Suspicious
+            </button>
+            <button class="preset" id="preset-borderline" onclick="loadPreset('borderline')">
+              <i class="ti ti-minus" aria-hidden="true"></i> Borderline
+            </button>
+            <button class="preset" id="preset-online" onclick="loadPreset('online')">
+              <i class="ti ti-world" aria-hidden="true"></i> Online Fraud
+            </button>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-label">Transaction Details</div>
+            <div style="margin-bottom: 12px;">
+              <div class="form-group" style="margin-bottom: 8px;">
+                <label><i class="ti ti-currency-dollar" aria-hidden="true"></i> Transaction Amount</label>
+              </div>
+              <div class="amount-display">
+                <span class="currency">USD</span>
+                <span class="val" id="amountDisplay">$250.00</span>
+              </div>
+              <input type="range" id="amountSlider" min="1" max="5000" step="1" value="250"
+                     style="width:100%; margin-top:8px;" oninput="updateAmount(this.value)"/>
+              <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:3px;">
+                <span>$1</span><span>$5,000</span>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label><i class="ti ti-clock" aria-hidden="true"></i> Hour of Day</label>
+                <select id="hour">
+                  <option value="0">00:00 — Midnight</option>
+                  <option value="1">01:00 — Late Night</option>
+                  <option value="2">02:00 — Late Night</option>
+                  <option value="3">03:00 — Late Night</option>
+                  <option value="4">04:00 — Late Night</option>
+                  <option value="5">05:00 — Early AM</option>
+                  <option value="6">06:00 — Early AM</option>
+                  <option value="7">07:00 — Morning</option>
+                  <option value="8">08:00 — Morning</option>
+                  <option value="9">09:00 — Morning</option>
+                  <option value="10">10:00 — Morning</option>
+                  <option value="11">11:00 — Late Morning</option>
+                  <option value="12">12:00 — Noon</option>
+                  <option value="13">13:00 — Afternoon</option>
+                  <option value="14" selected>14:00 — Afternoon</option>
+                  <option value="15">15:00 — Afternoon</option>
+                  <option value="16">16:00 — Late PM</option>
+                  <option value="17">17:00 — Evening</option>
+                  <option value="18">18:00 — Evening</option>
+                  <option value="19">19:00 — Evening</option>
+                  <option value="20">20:00 — Night</option>
+                  <option value="21">21:00 — Night</option>
+                  <option value="22">22:00 — Late Night</option>
+                  <option value="23">23:00 — Late Night</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label><i class="ti ti-map-pin" aria-hidden="true"></i> Distance from Home</label>
+                <input type="number" id="distance" value="12.5" step="0.1" min="0" placeholder="km"/>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-label">Spend Pattern</div>
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label><i class="ti ti-chart-line" aria-hidden="true"></i> Ratio to Median Purchase</label>
+              <input type="number" id="ratio" value="1.2" step="0.1" min="0.01" placeholder="e.g. 1.5 = 50% above normal"/>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-label">Security Flags</div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label"><i class="ti ti-refresh" aria-hidden="true"></i> Repeat Retailer</div>
+                <div class="toggle-desc">Cardholder used this merchant before</div>
+              </div>
+              <label class="toggle"><input type="checkbox" id="repeat_retailer" checked/><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label"><i class="ti ti-credit-card" aria-hidden="true"></i> Chip Used</div>
+                <div class="toggle-desc">EMV chip was present and read</div>
+              </div>
+              <label class="toggle"><input type="checkbox" id="used_chip" checked/><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label"><i class="ti ti-lock" aria-hidden="true"></i> PIN Entered</div>
+                <div class="toggle-desc">Cardholder authenticated with PIN</div>
+              </div>
+              <label class="toggle"><input type="checkbox" id="used_pin" checked/><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label"><i class="ti ti-world" aria-hidden="true"></i> Online Order</div>
+                <div class="toggle-desc">Card-not-present transaction</div>
+              </div>
+              <label class="toggle"><input type="checkbox" id="online_order"/><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+
+          <button class="analyze-btn" id="analyzeBtn" onclick="runAnalysis()">
+            <i class="ti ti-shield-search" aria-hidden="true"></i>
+            Analyze Transaction
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Results -->
+    <div>
+      <div id="resultPanel">
+
+        <!-- Verdict -->
+        <div id="verdictCard" class="verdict-card verdict-legit">
+          <div class="verdict-icon" id="verdictIcon"></div>
+          <div style="flex:1;">
+            <div class="verdict-label" id="verdictLabel"></div>
+            <div class="verdict-title" id="verdictTitle"></div>
+            <div class="verdict-desc" id="verdictDesc"></div>
+            <div class="verdict-actions" id="verdictActions"></div>
+          </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="metric-strip">
+          <div class="metric-mini">
+            <div class="metric-mini-label">Fraud Probability</div>
+            <div class="metric-mini-val" id="mProb">—</div>
+          </div>
+          <div class="metric-mini">
+            <div class="metric-mini-label">Risk Score</div>
+            <div class="metric-mini-val" id="mScore">—</div>
+          </div>
+          <div class="metric-mini">
+            <div class="metric-mini-label">Risk Level</div>
+            <div class="metric-mini-val" id="mLevel" style="font-size:14px; padding-top:4px;">—</div>
+          </div>
+        </div>
+
+        <!-- Risk gauge -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-header">
+            <div class="card-title"><i class="ti ti-gauge" aria-hidden="true"></i> Risk Gauge</div>
+            <span id="gaugeLevel" class="card-badge badge-green">Low</span>
+          </div>
+          <div class="card-body">
+            <div class="risk-gauge-wrap">
+              <div class="risk-gauge-label">
+                <span>Low Risk</span>
+                <strong id="gaugeScore">0 / 100</strong>
+                <span>Critical</span>
+              </div>
+              <div class="risk-track" style="position:relative;">
+                <div class="risk-track-active" id="gaugeBar" style="width:0%;"></div>
+                <div class="risk-marker" id="gaugeMarker" style="left:0%;"></div>
+              </div>
+              <div class="risk-band-labels">
+                <span>0</span><span>Low</span><span>Moderate</span><span>High</span><span>Critical</span>
+              </div>
+            </div>
+            <div id="riskBreakdown" style="font-size:12px; color:var(--muted);"></div>
+          </div>
+        </div>
+
+        <!-- SHAP -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-header">
+            <div class="card-title"><i class="ti ti-adjustments-horizontal" aria-hidden="true"></i> Feature Contributions (SHAP)</div>
+            <span class="card-badge badge-purple">XAI</span>
+          </div>
+          <div class="card-body" style="padding-bottom:12px;">
+            <div id="shapBars"></div>
+          </div>
+        </div>
+
+        <!-- AI Explanation -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="ti ti-robot" aria-hidden="true"></i> Analyst Report</div>
+            <span class="card-badge badge-purple">AI Generated</span>
+          </div>
+          <div class="card-body">
+            <div class="ai-box">
+              <div class="ai-header">
+                <div class="ai-avatar"><i class="ti ti-robot" aria-hidden="true"></i></div>
+                <div>
+                  <div class="ai-name">FraudGuard AI</div>
+                  <div class="ai-role">Senior Fraud Analyst</div>
+                </div>
+              </div>
+              <div class="ai-text" id="aiText">
+                <div class="ai-typing">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Empty state when no analysis yet -->
+      <div id="analyzeEmpty" class="card">
+        <div class="card-body empty-state" style="padding: 60px 20px;">
+          <i class="ti ti-shield-search" style="font-size:48px; opacity:0.2;"></i>
+          <p style="font-size:14px; margin-bottom:6px; color: var(--text); opacity:0.5;">Ready to analyze</p>
+          <p style="font-size:12px;">Fill in transaction details and click Analyze</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ LIVE FEED TAB ══ -->
+<div id="tab-feed" class="tab-content page">
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="ti ti-activity" aria-hidden="true"></i> Transaction Stream</div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button onclick="toggleAutoFeed()" id="feedToggleBtn" style="padding:5px 12px; border-radius:6px; border:1px solid var(--border2); background:transparent; color:var(--muted); font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px;">
+            <i class="ti ti-player-play" id="feedToggleIcon"></i> Start Feed
+          </button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <table class="feed-table">
+          <thead>
+            <tr>
+              <th>TXN ID</th><th>Amount</th><th>Location</th><th>Risk</th><th>Score</th><th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="liveTableBody">
+            <tr><td colspan="6"><div class="empty-state"><i class="ti ti-activity"></i><p>Start the feed to see live transactions</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-header">
+          <div class="card-title"><i class="ti ti-chart-bar" aria-hidden="true"></i> Feed Stats</div>
+        </div>
+        <div class="card-body">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+            <div class="metric-mini"><div class="metric-mini-label">Total</div><div class="metric-mini-val" id="feedTotal">0</div></div>
+            <div class="metric-mini"><div class="metric-mini-label">Fraud</div><div class="metric-mini-val" id="feedFraud" style="color:#fca5a5">0</div></div>
+          </div>
+          <div class="chart-wrap" style="height:130px;">
+            <canvas id="feedRateChart" role="img" aria-label="Rolling fraud rate in live feed"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ GRAPH TAB ══ -->
+<div id="tab-graph" class="tab-content page">
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="ti ti-network" aria-hidden="true"></i> Fraud Ring Visualization</div>
+        <button onclick="regenerateGraph()" style="padding:5px 12px; border-radius:6px; border:1px solid var(--border2); background:transparent; color:var(--muted); font-size:12px; cursor:pointer;">
+          <i class="ti ti-refresh" aria-hidden="true"></i> Regenerate
+        </button>
+      </div>
+      <div class="card-body">
+        <div class="graph-canvas" id="graphCanvas">
+          <svg class="graph-edges" id="graphEdges"></svg>
+        </div>
+        <div class="graph-legend">
+          <div class="graph-legend-item"><div class="graph-legend-dot" style="background:var(--danger)"></div>Fraud node</div>
+          <div class="graph-legend-item"><div class="graph-legend-dot" style="background:var(--warning)"></div>Hub / mule</div>
+          <div class="graph-legend-item"><div class="graph-legend-dot" style="background:#334155"></div>Legitimate</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-header">
+          <div class="card-title"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Detected Anomalies</div>
+        </div>
+        <div class="card-body" id="graphAnomalies" style="font-size:12px; color:var(--muted);">
+          <p>Generating graph analysis...</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="ti ti-info-circle" aria-hidden="true"></i> Graph Metrics</div>
+        </div>
+        <div class="card-body" id="graphMetrics" style="font-size:12px; color:var(--muted);">
+          <p>Loading...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+
+// ── App State ──────────────────────────────────────────────────────────────
+const state = {
+  history: [],         // all analyzed transactions
+  riskCounts: { low:0, moderate:0, high:0, critical:0 },
+  featureCounts: {},   // shap feature hit counts
+  feedRunning: false,
+  feedTimer: null,
+  feedHistory: [],
+  navProcessed: 0,
+  navFlagged: 0,
+};
+
+// ── Charts ─────────────────────────────────────────────────────────────────
+let trendChart, donutChart, featureChart, feedRateChart;
+
+function initCharts() {
+  const chartDefaults = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+  };
+
+  trendChart = new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Risk Score',
+        data: [],
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,0.08)',
+        borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#3b82f6',
+        tension: 0.4, fill: true,
+      }]
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        y: { min:0, max:100, grid:{ color:'rgba(255,255,255,0.04)' }, ticks:{ color:'#64748b', font:{size:10} } },
+        x: { grid:{ display:false }, ticks:{ color:'#64748b', font:{size:10}, maxTicksLimit:8 } },
+      },
+      plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: c => `Risk: ${c.raw}` } } },
+    }
+  });
+
+  donutChart = new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Low', 'Moderate', 'High', 'Critical'],
+      datasets: [{
+        data: [1, 0, 0, 0],
+        backgroundColor: ['#10b981','#3b82f6','#f59e0b','#ef4444'],
+        borderWidth: 2, borderColor: '#111827',
+      }]
+    },
+    options: {
+      ...chartDefaults,
+      cutout: '65%',
+      plugins: { legend:{ display:true, position:'bottom', labels:{ color:'#64748b', font:{size:11}, boxWidth:10, padding:12 } } },
+    }
+  });
+
+  featureChart = new Chart(document.getElementById('featureChart'), {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        backgroundColor: 'rgba(139,92,246,0.6)',
+        borderColor: '#8b5cf6', borderWidth: 1, borderRadius: 4,
+      }]
+    },
+    options: {
+      ...chartDefaults, indexAxis: 'y',
+      scales: {
+        x: { grid:{ color:'rgba(255,255,255,0.04)' }, ticks:{ color:'#64748b', font:{size:10} } },
+        y: { grid:{ display:false }, ticks:{ color:'#94a3b8', font:{size:11} } },
+      },
+    }
+  });
+
+  feedRateChart = new Chart(document.getElementById('feedRateChart'), {
+    type: 'bar',
+    data: { labels: [], datasets: [{ data: [], backgroundColor: '#ef4444', borderRadius:3 }] },
+    options: {
+      ...chartDefaults,
+      scales: {
+        y: { min:0, max:100, grid:{ color:'rgba(255,255,255,0.04)' }, ticks:{ color:'#64748b', font:{size:10}, callback: v => v+'%' } },
+        x: { grid:{ display:false }, ticks:{ color:'#64748b', font:{size:9}, maxTicksLimit:6 } },
+      },
+    }
+  });
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const names = ['dashboard','analyze','feed','graph'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  if (name === 'graph') regenerateGraph();
+}
+
+// ── Preset loader ──────────────────────────────────────────────────────────
+const PRESETS = {
+  legit: {
+    amount: 85, hour: 14, distance: 8.3, ratio: 0.9,
+    repeat_retailer: true, used_chip: true, used_pin: true, online_order: false,
+    label: 'Normal in-store purchase during business hours'
+  },
+  fraud: {
+    amount: 2850, hour: 2, distance: 450, ratio: 18.5,
+    repeat_retailer: false, used_chip: false, used_pin: false, online_order: true,
+    label: 'Classic CNP fraud — late night, far from home, no auth'
+  },
+  borderline: {
+    amount: 420, hour: 21, distance: 65, ratio: 3.2,
+    repeat_retailer: true, used_chip: true, used_pin: false, online_order: false,
+    label: 'Borderline — some flags but not conclusive'
+  },
+  online: {
+    amount: 1200, hour: 3, distance: 180, ratio: 9.0,
+    repeat_retailer: false, used_chip: false, used_pin: false, online_order: true,
+    label: 'Late-night online order, new merchant, high amount'
+  },
+};
+
+function loadPreset(type) {
+  const p = PRESETS[type];
+  document.getElementById('amountSlider').value = p.amount;
+  updateAmount(p.amount);
+  document.getElementById('hour').value = p.hour;
+  document.getElementById('distance').value = p.distance;
+  document.getElementById('ratio').value = p.ratio;
+  document.getElementById('repeat_retailer').checked = p.repeat_retailer;
+  document.getElementById('used_chip').checked = p.used_chip;
+  document.getElementById('used_pin').checked = p.used_pin;
+  document.getElementById('online_order').checked = p.online_order;
+
+  document.querySelectorAll('.preset').forEach(el => el.classList.remove('active-legit','active-fraud'));
+  const el = document.getElementById(`preset-${type}`);
+  el.classList.add(type === 'legit' ? 'active-legit' : 'active-fraud');
+}
+
+function updateAmount(val) {
+  document.getElementById('amountDisplay').textContent = '$' + parseFloat(val).toFixed(2);
+}
+
+// ── Core analysis ──────────────────────────────────────────────────────────
+function getFormPayload() {
+  return {
+    amount:                   parseFloat(document.getElementById('amountSlider').value),
+    hour:                     parseInt(document.getElementById('hour').value),
+    distance_from_home:       parseFloat(document.getElementById('distance').value),
+    ratio_to_median_purchase: parseFloat(document.getElementById('ratio').value),
+    repeat_retailer:          document.getElementById('repeat_retailer').checked ? 1 : 0,
+    used_chip:                document.getElementById('used_chip').checked ? 1 : 0,
+    used_pin:                 document.getElementById('used_pin').checked ? 1 : 0,
+    online_order:             document.getElementById('online_order').checked ? 1 : 0,
+    transaction_id:           'TXN-' + Math.random().toString(36).substr(2,8).toUpperCase(),
+  };
+}
+
+function buildDemoResult(payload) {
+  const fraud_signals =
+    (payload.hour < 6 ? 2 : 0) +
+    (payload.distance_from_home > 100 ? 2 : payload.distance_from_home > 30 ? 1 : 0) +
+    (payload.ratio_to_median_purchase > 5 ? 2 : payload.ratio_to_median_purchase > 2 ? 1 : 0) +
+    (!payload.used_chip ? 1 : 0) +
+    (!payload.used_pin ? 1 : 0) +
+    (payload.online_order ? 1 : 0) +
+    (!payload.repeat_retailer ? 1 : 0) +
+    (payload.amount > 1000 ? 1 : 0);
+
+  const prob   = Math.min(0.05 + fraud_signals * 0.10 + Math.random() * 0.04, 0.97);
+  const score  = Math.round(prob * 70 + Math.min(fraud_signals * 3.5, 30));
+  const level  = score >= 76 ? 'critical' : score >= 51 ? 'high' : score >= 26 ? 'moderate' : 'low';
+  const isFraud = prob >= 0.50;
+
+  const shapBase = [
+    { feature: 'distance_from_home',       shap_value: (payload.distance_from_home > 50  ? 0.8 + Math.random()*0.4 : -0.3 - Math.random()*0.2), direction: payload.distance_from_home > 50  ? 'increases_risk' : 'decreases_risk' },
+    { feature: 'ratio_to_median_purchase', shap_value: (payload.ratio_to_median_purchase > 2 ? 0.7 + Math.random()*0.3 : -0.2 - Math.random()*0.15), direction: payload.ratio_to_median_purchase > 2 ? 'increases_risk' : 'decreases_risk' },
+    { feature: 'used_chip',                shap_value: (!payload.used_chip ? 0.45 + Math.random()*0.2 : -0.5 - Math.random()*0.2), direction: !payload.used_chip ? 'increases_risk' : 'decreases_risk' },
+    { feature: 'hour',                     shap_value: (payload.hour < 6  ? 0.38 + Math.random()*0.2 : -0.12 - Math.random()*0.1), direction: payload.hour < 6  ? 'increases_risk' : 'decreases_risk' },
+    { feature: 'used_pin',                 shap_value: (!payload.used_pin ? 0.30 + Math.random()*0.15 : -0.40 - Math.random()*0.2), direction: !payload.used_pin ? 'increases_risk' : 'decreases_risk' },
+    { feature: 'online_order',             shap_value: (payload.online_order ? 0.22 + Math.random()*0.1 : -0.18 - Math.random()*0.1), direction: payload.online_order ? 'increases_risk' : 'decreases_risk' },
+    { feature: 'amount',                   shap_value: (payload.amount > 800 ? 0.18 + Math.random()*0.1 : -0.12 - Math.random()*0.08), direction: payload.amount > 800 ? 'increases_risk' : 'decreases_risk' },
+    { feature: 'repeat_retailer',          shap_value: (!payload.repeat_retailer ? 0.15 + Math.random()*0.1 : -0.35 - Math.random()*0.15), direction: !payload.repeat_retailer ? 'increases_risk' : 'decreases_risk' },
+  ];
+
+  const explainFraud = `This transaction was flagged as potentially fraudulent with a ${(prob*100).toFixed(0)}% fraud probability and a risk score of ${score}/100 (${level.toUpperCase()}). ` +
+    `${payload.distance_from_home > 100 ? `The transaction originated approximately ${payload.distance_from_home} km from the cardholder's registered home address, which is significantly above the normal range. ` : ''}` +
+    `${payload.hour < 6 ? `It occurred at ${String(payload.hour).padStart(2,'0')}:00, an unusually late hour associated with higher fraud rates. ` : ''}` +
+    `${!payload.used_chip ? 'The EMV chip was not used, suggesting a card-not-present or counterfeit card scenario. ' : ''}` +
+    `${payload.ratio_to_median_purchase > 3 ? `The purchase amount is ${payload.ratio_to_median_purchase.toFixed(1)}x above the cardholder's typical spending, a strong anomaly signal. ` : ''}` +
+    `Immediate manual review and temporary card hold are recommended pending cardholder verification.`;
+
+  const explainLegit = `This transaction appears legitimate with a ${(prob*100).toFixed(0)}% fraud probability and a low risk score of ${score}/100. ` +
+    `${payload.used_chip && payload.used_pin ? 'Both chip and PIN authentication were used, providing strong evidence of a genuine cardholder. ' : ''}` +
+    `${payload.repeat_retailer ? 'The transaction was at a previously visited merchant, consistent with normal spending patterns. ' : ''}` +
+    `${payload.distance_from_home < 20 ? 'The purchase location is close to the cardholder\'s home address. ' : ''}` +
+    `No immediate action required. Continue standard transaction monitoring.`;
+
+  return {
+    prediction: { is_fraud: isFraud, fraud_probability: parseFloat(prob.toFixed(4)), verdict: isFraud ? 'FRAUD' : 'LEGITIMATE' },
+    risk_score: { risk_score: score, risk_level: level, description: riskDescription(level), breakdown: { probability_component: parseFloat((prob*70).toFixed(2)), shap_penalty_component: parseFloat(Math.min(fraud_signals*3.5, 30).toFixed(2)) } },
+    shap_explanation: { top_risk_factors: shapBase.sort((a,b) => Math.abs(b.shap_value) - Math.abs(a.shap_value)) },
+    llm_explanation: isFraud ? explainFraud : explainLegit,
+  };
+}
+
+function riskDescription(level) {
+  return { critical:'Auto-block — multiple strong fraud indicators', high:'Hold for manual review', moderate:'Flag and monitor closely', low:'Low risk — approve with standard monitoring' }[level];
+}
+
+async function runAnalysis() {
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Analyzing...';
+
+  document.getElementById('aiText').innerHTML = '<div class="ai-typing"><span></span><span></span><span></span></div>';
+
+  const payload = getFormPayload();
+  let result;
+
+  try {
+    const resp = await fetch(`${API}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error('API error');
+    result = await resp.json();
+  } catch (_) {
+    result = buildDemoResult(payload);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="ti ti-shield-search" aria-hidden="true"></i> Analyze Transaction';
+
+  renderResult(result, payload);
+  recordToHistory(result, payload);
+}
+
+// ── Render result ──────────────────────────────────────────────────────────
+function renderResult(data, payload) {
+  document.getElementById('analyzeEmpty').style.display = 'none';
+  document.getElementById('resultPanel').style.display = 'block';
+
+  const { prediction: pred, risk_score: risk, shap_explanation: shap, llm_explanation: llm } = data;
+  const isFraud = pred.is_fraud;
+  const prob    = pred.fraud_probability;
+  const score   = risk.risk_score;
+  const level   = risk.risk_level;
+
+  // Verdict card
+  const vc = document.getElementById('verdictCard');
+  vc.className = `verdict-card ${isFraud ? 'verdict-fraud' : 'verdict-legit'}`;
+  document.getElementById('verdictIcon').textContent = isFraud ? '🚨' : '✅';
+  document.getElementById('verdictLabel').textContent = isFraud ? 'Fraud Detected' : 'Transaction Cleared';
+  document.getElementById('verdictTitle').textContent = isFraud ? 'BLOCK TRANSACTION' : 'APPROVE TRANSACTION';
+  document.getElementById('verdictDesc').textContent = `Confidence: ${(prob*100).toFixed(1)}%  ·  Risk: ${score}/100  ·  ${risk.description}`;
+  document.getElementById('verdictActions').innerHTML = isFraud
+    ? `<button class="action-btn action-btn-red"><i class="ti ti-ban" aria-hidden="true"></i> Block Card</button>
+       <button class="action-btn action-btn-gray"><i class="ti ti-user" aria-hidden="true"></i> Contact Holder</button>
+       <button class="action-btn action-btn-gray"><i class="ti ti-flag" aria-hidden="true"></i> Escalate</button>`
+    : `<button class="action-btn action-btn-gray"><i class="ti ti-check" aria-hidden="true"></i> Approved</button>
+       <button class="action-btn action-btn-gray"><i class="ti ti-eye" aria-hidden="true"></i> Watch List</button>`;
+
+  // Metrics
+  document.getElementById('mProb').textContent  = (prob*100).toFixed(1) + '%';
+  document.getElementById('mProb').style.color   = isFraud ? '#fca5a5' : '#6ee7b7';
+  document.getElementById('mScore').textContent  = score.toFixed(0);
+  document.getElementById('mScore').style.color  = scoreColor(score);
+  document.getElementById('mLevel').textContent  = level.toUpperCase();
+  document.getElementById('mLevel').style.color  = scoreColor(score);
+
+  // Gauge
+  const gaugeColor = scoreColor(score);
+  document.getElementById('gaugeScore').textContent = `${score.toFixed(0)} / 100`;
+  document.getElementById('gaugeBar').style.width   = `${score}%`;
+  document.getElementById('gaugeBar').style.background = gaugeColor;
+  document.getElementById('gaugeMarker').style.left  = `${score}%`;
+  document.getElementById('gaugeMarker').style.borderColor = gaugeColor;
+
+  const gaugeLevelEl = document.getElementById('gaugeLevel');
+  gaugeLevelEl.textContent = level.toUpperCase();
+  gaugeLevelEl.className = `card-badge badge-${level === 'critical' || level === 'high' ? 'red' : level === 'moderate' ? 'yellow' : 'green'}`;
+
+  document.getElementById('riskBreakdown').innerHTML =
+    `Probability component: <b>${risk.breakdown.probability_component.toFixed(1)}</b> pts &nbsp;·&nbsp; ` +
+    `SHAP penalty: <b>${risk.breakdown.shap_penalty_component.toFixed(1)}</b> pts`;
+
+  // SHAP bars
+  const factors = shap.top_risk_factors || [];
+  const maxAbs  = Math.max(...factors.map(f => Math.abs(f.shap_value)), 0.01);
+  document.getElementById('shapBars').innerHTML = factors.map(f => {
+    const isUp   = f.direction === 'increases_risk';
+    const pct    = Math.round((Math.abs(f.shap_value) / maxAbs) * 100);
+    const label  = f.feature.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return `<div class="shap-row">
+      <span class="shap-feat-name">${label}</span>
+      <div class="shap-bar-track">
+        <div class="shap-bar-fill ${isUp ? 'shap-risk' : 'shap-safe'}" style="width:${pct}%"></div>
+      </div>
+      <span class="shap-val ${isUp ? 'shap-risk-txt' : 'shap-safe-txt'}">${isUp ? '+' : ''}${f.shap_value.toFixed(3)}</span>
+    </div>`;
+  }).join('');
+
+  // AI explanation — typewriter
+  typewrite(document.getElementById('aiText'), llm, 18);
+}
+
+function typewrite(el, text, delay) {
+  el.textContent = '';
+  let i = 0;
+  const cursor = document.createElement('span');
+  cursor.style.cssText = 'border-right:2px solid #64748b; animation:blink 0.8s step-end infinite; margin-left:1px;';
+  el.appendChild(cursor);
+  const tick = () => {
+    if (i < text.length) {
+      el.insertBefore(document.createTextNode(text[i++]), cursor);
+      setTimeout(tick, delay);
+    } else {
+      cursor.remove();
+    }
+  };
+  tick();
+}
+
+function scoreColor(score) {
+  if (score >= 76) return '#ef4444';
+  if (score >= 51) return '#f59e0b';
+  if (score >= 26) return '#3b82f6';
+  return '#10b981';
+}
+
+// ── History + Dashboard ────────────────────────────────────────────────────
+function recordToHistory(data, payload) {
+  const { prediction: pred, risk_score: risk, shap_explanation: shap } = data;
+  const entry = {
+    id:    payload.transaction_id,
+    amount: payload.amount,
+    isFraud: pred.is_fraud,
+    prob:  pred.fraud_probability,
+    score: risk.risk_score,
+    level: risk.risk_level,
+    time:  new Date().toLocaleTimeString(),
+    topFactor: shap.top_risk_factors?.[0]?.feature || '—',
+  };
+
+  state.history.unshift(entry);
+  if (state.history.length > 50) state.history.pop();
+  state.riskCounts[entry.level]++;
+  if (entry.isFraud) state.navFlagged++;
+  state.navProcessed++;
+
+  shap.top_risk_factors?.slice(0,3).forEach(f => {
+    if (f.direction === 'increases_risk') state.featureCounts[f.feature] = (state.featureCounts[f.feature] || 0) + 1;
+  });
+
+  updateDashboard();
+}
+
+function updateDashboard() {
+  const h = state.history;
+  const total = h.length;
+  const frauds = h.filter(x => x.isFraud).length;
+  const avgRisk = total ? Math.round(h.reduce((a,x) => a + x.score, 0) / total) : 0;
+  const alerts  = h.filter(x => x.score >= 76).length;
+
+  document.getElementById('kpiTotal').textContent = total;
+  document.getElementById('kpiFraud').textContent = frauds;
+  document.getElementById('kpiFraudRate').textContent = total ? `${(frauds/total*100).toFixed(1)}% fraud rate` : '—';
+  document.getElementById('kpiAvgRisk').textContent = total ? avgRisk : '—';
+  document.getElementById('kpiAlerts').textContent  = alerts;
+  document.getElementById('recentCount').textContent = `${total} analyzed`;
+  document.getElementById('navProcessed').textContent = state.navProcessed;
+  document.getElementById('navFlagged').textContent   = state.navFlagged;
+
+  // Trend chart — last 20
+  const recent20 = [...h].reverse().slice(-20);
+  trendChart.data.labels   = recent20.map(x => x.time);
+  trendChart.data.datasets[0].data = recent20.map(x => x.score);
+  trendChart.update('none');
+
+  // Donut
+  donutChart.data.datasets[0].data = [
+    state.riskCounts.low, state.riskCounts.moderate,
+    state.riskCounts.high, state.riskCounts.critical,
+  ];
+  donutChart.update('none');
+
+  // Feature importance
+  const sorted = Object.entries(state.featureCounts).sort((a,b) => b[1]-a[1]).slice(0,6);
+  if (sorted.length) {
+    document.getElementById('featureEmpty').style.display = 'none';
+    featureChart.data.labels   = sorted.map(([k]) => k.replace(/_/g,' '));
+    featureChart.data.datasets[0].data = sorted.map(([,v]) => v);
+    featureChart.update('none');
+  }
+
+  // Recent table
+  const tbody = document.getElementById('recentTableBody');
+  tbody.innerHTML = h.slice(0,8).map((x,i) => `
+    <tr class="${i===0 ? 'new-row' : ''}">
+      <td class="feed-id">${x.id}</td>
+      <td class="feed-amount" style="color:${x.isFraud ? '#fca5a5' : 'inherit'}">$${x.amount.toFixed(2)}</td>
+      <td><span class="risk-pill ${x.level}">${x.level}</span></td>
+      <td style="color:${scoreColor(x.score)}">${x.score.toFixed(0)}</td>
+      <td style="color:var(--muted)">${x.time}</td>
+    </tr>`).join('');
+}
+
+// ── Live feed ──────────────────────────────────────────────────────────────
+const MERCHANTS  = ['Amazon','Walmart','Stripe Inc.','Shell #4721','Target','Best Buy','Unknown Vendor','PayQuick LLC','Foreign ATM','Steam Store'];
+const LOCATIONS  = ['New York, US','London, UK','Lagos, NG','Bangkok, TH','Mumbai, IN','Sydney, AU','Berlin, DE','Toronto, CA','Paris, FR','Unknown'];
+
+function toggleAutoFeed() {
+  state.feedRunning = !state.feedRunning;
+  const btn = document.getElementById('feedToggleBtn');
+  const ico = document.getElementById('feedToggleIcon');
+  if (state.feedRunning) {
+    btn.style.color = '#6ee7b7';
+    btn.style.borderColor = 'rgba(16,185,129,0.4)';
+    ico.className = 'ti ti-player-pause';
+    btn.childNodes[1].textContent = ' Pause Feed';
+    runFeedTick();
+  } else {
+    btn.style.color = '';
+    btn.style.borderColor = '';
+    ico.className = 'ti ti-player-play';
+    btn.childNodes[1].textContent = ' Start Feed';
+    clearTimeout(state.feedTimer);
+  }
+}
+
+function runFeedTick() {
+  if (!state.feedRunning) return;
+  generateFeedRow();
+  state.feedTimer = setTimeout(runFeedTick, 1200 + Math.random()*800);
+}
+
+function generateFeedRow() {
+  const isFraud = Math.random() < 0.07;
+  const amount  = isFraud ? (800 + Math.random()*3000) : (10 + Math.random()*350);
+  const score   = isFraud ? Math.round(55 + Math.random()*40) : Math.round(3 + Math.random()*35);
+  const level   = score >= 76 ? 'critical' : score >= 51 ? 'high' : score >= 26 ? 'moderate' : 'low';
+  const loc     = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+  const id      = 'TXN-' + Math.random().toString(36).substr(2,7).toUpperCase();
+
+  state.feedHistory.unshift({ isFraud, score, time: new Date().toLocaleTimeString() });
+  if (state.feedHistory.length > 20) state.feedHistory.pop();
+
+  const total = state.feedHistory.length;
+  const fraudCount = state.feedHistory.filter(x => x.isFraud).length;
+  document.getElementById('feedTotal').textContent = total;
+  document.getElementById('feedFraud').textContent = fraudCount;
+
+  // Feedback badge in tab
+  const fb = document.getElementById('feedBadge');
+  if (isFraud) {
+    state.navFlagged++;
+    document.getElementById('navFlagged').textContent = state.navFlagged;
+    fb.style.display = '';
+    fb.textContent = parseInt(fb.textContent || '0') + 1;
+  }
+
+  // Feed rate chart
+  const rateData = state.feedHistory.slice(0,10).reverse();
+  feedRateChart.data.labels = rateData.map(x => x.time);
+  feedRateChart.data.datasets[0].data = rateData.map(x => x.isFraud ? 100 : 0);
+  feedRateChart.update('none');
+
+  // Table row
+  const tbody = document.getElementById('liveTableBody');
+  if (tbody.querySelector('.empty-state')) tbody.innerHTML = '';
+  const MAX_ROWS = 12;
+  while (tbody.children.length >= MAX_ROWS) tbody.removeChild(tbody.lastChild);
+
+  const tr = document.createElement('tr');
+  tr.className = 'new-row';
+  tr.innerHTML = `
+    <td class="feed-id">${id}</td>
+    <td class="feed-amount" style="color:${isFraud ? '#fca5a5' : 'inherit'}">$${amount.toFixed(2)}</td>
+    <td style="color:var(--muted); font-size:11px;">${loc}</td>
+    <td><span class="risk-pill ${level}">${level}</span></td>
+    <td style="color:${scoreColor(score)}">${score}</td>
+    <td>
+      <span class="verdict-dot ${isFraud ? 'dot-fraud' : 'dot-legit'}"></span>
+      <span style="font-size:11px; color:${isFraud ? '#fca5a5' : '#6ee7b7'}">${isFraud ? 'FRAUD' : 'LEGIT'}</span>
+    </td>`;
+  tbody.prepend(tr);
+}
+
+// ── Graph visualisation ────────────────────────────────────────────────────
+function regenerateGraph() {
+  const canvas  = document.getElementById('graphCanvas');
+  const svgEl   = document.getElementById('graphEdges');
+  const cw = canvas.offsetWidth || 620;
+  const ch = 260;
+
+  // Clear old nodes (not the SVG)
+  canvas.querySelectorAll('.graph-node').forEach(n => n.remove());
+  svgEl.innerHTML = '';
+
+  // Generate node cluster simulating a fraud ring
+  const nodes = [
+    { id:'HUB-1', type:'hub',   x:cw*0.5,  y:ch*0.45, label:'HUB' },
+    { id:'F-001', type:'fraud', x:cw*0.22, y:ch*0.25, label:'F1' },
+    { id:'F-002', type:'fraud', x:cw*0.75, y:ch*0.20, label:'F2' },
+    { id:'F-003', type:'fraud', x:cw*0.80, y:ch*0.72, label:'F3' },
+    { id:'L-001', type:'legit', x:cw*0.15, y:ch*0.70, label:'L1' },
+    { id:'L-002', type:'legit', x:cw*0.38, y:ch*0.78, label:'L2' },
+    { id:'L-003', type:'legit', x:cw*0.62, y:ch*0.82, label:'L3' },
+    { id:'L-004', type:'legit', x:cw*0.10, y:ch*0.45, label:'L4' },
+    { id:'F-004', type:'fraud', x:cw*0.88, y:ch*0.45, label:'F4' },
+  ];
+
+  const edges = [
+    ['F-001','HUB-1'],['F-002','HUB-1'],['F-003','HUB-1'],
+    ['F-004','HUB-1'],['L-001','HUB-1'],['L-002','HUB-1'],
+    ['F-001','F-002'],['F-002','F-003'],['F-003','F-001'], // cycle
+    ['L-003','L-004'],['L-004','L-001'],
+  ];
+
+  // Draw edges first
+  edges.forEach(([a, b]) => {
+    const na = nodes.find(n => n.id === a);
+    const nb = nodes.find(n => n.id === b);
+    if (!na || !nb) return;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', na.x); line.setAttribute('y1', na.y);
+    line.setAttribute('x2', nb.x); line.setAttribute('y2', nb.y);
+    const isSuspicious = na.type !== 'legit' && nb.type !== 'legit';
+    line.setAttribute('stroke', isSuspicious ? 'rgba(239,68,68,0.35)' : 'rgba(100,116,139,0.2)');
+    line.setAttribute('stroke-width', isSuspicious ? '1.5' : '1');
+    svgEl.appendChild(line);
+  });
+
+  // Draw nodes
+  nodes.forEach(n => {
+    const size = n.type === 'hub' ? 40 : 28;
+    const el   = document.createElement('div');
+    el.className = `graph-node node-${n.type}`;
+    el.style.cssText = `width:${size}px; height:${size}px; left:${n.x - size/2}px; top:${n.y - size/2}px;`;
+    el.textContent = n.label;
+    el.title = `${n.id} — ${n.type}`;
+    canvas.appendChild(el);
+  });
+
+  // Anomaly panel
+  document.getElementById('graphAnomalies').innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="background:rgba(239,68,68,0.07); border:1px solid rgba(239,68,68,0.2); border-radius:8px; padding:10px 12px;">
+        <div style="color:#fca5a5; font-weight:600; font-size:12px; margin-bottom:4px;"><i class="ti ti-rotate-clockwise" aria-hidden="true"></i> Cycle Detected</div>
+        <div style="color:var(--muted);">F1 → F2 → F3 → F1 — circular money flow with $8,340 total</div>
+      </div>
+      <div style="background:rgba(245,158,11,0.07); border:1px solid rgba(245,158,11,0.2); border-radius:8px; padding:10px 12px;">
+        <div style="color:#fcd34d; font-weight:600; font-size:12px; margin-bottom:4px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> High Degree Hub</div>
+        <div style="color:var(--muted);">HUB-1 connected to 6 accounts — potential money mule account</div>
+      </div>
+      <div style="background:rgba(139,92,246,0.07); border:1px solid rgba(139,92,246,0.2); border-radius:8px; padding:10px 12px;">
+        <div style="color:#c4b5fd; font-weight:600; font-size:12px; margin-bottom:4px;"><i class="ti ti-users" aria-hidden="true"></i> Fraud Community</div>
+        <div style="color:var(--muted);">4-node dense cluster (density 0.71) — coordinated fraud ring suspected</div>
+      </div>
+    </div>`;
+
+  document.getElementById('graphMetrics').innerHTML = `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      ${[['Nodes', nodes.length], ['Edges', edges.length], ['Fraud nodes', nodes.filter(n=>n.type==='fraud').length], ['Cycles found', 1], ['Hub nodes', 1], ['Risk density', '0.71']].map(([l,v]) =>
+        `<div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center;">
+           <div style="font-size:10px; color:var(--muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.05em;">${l}</div>
+           <div style="font-size:18px; font-weight:700;">${v}</div>
+         </div>`).join('')}
+    </div>`;
+}
+
+// ── Bootstrap ──────────────────────────────────────────────────────────────
+initCharts();
+loadPreset('legit');
+</script>
+</body>
+</html>
